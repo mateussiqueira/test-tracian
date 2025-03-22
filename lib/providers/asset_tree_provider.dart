@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/asset.dart';
@@ -31,6 +33,13 @@ class AssetTreeProvider extends ChangeNotifier {
   bool _showEnergySensors = false;
   bool _showCriticalStatus = false;
 
+  // Cache e otimizações
+  final Map<String, List<Asset>> _assetCache = {};
+  final Map<String, List<Location>> _locationCache = {};
+  Timer? _debounceTimer;
+  bool _isDirty = false;
+  Timer? _notifyTimer;
+
   // Estado de expansão dos nós
   final Map<String, ValueNotifier<bool>> _expansionNotifiers = {};
 
@@ -55,6 +64,7 @@ class AssetTreeProvider extends ChangeNotifier {
       _locations =
           locationsJson.map((json) => Location.fromJson(json)).toList();
       _assets = assetsJson.map((json) => Asset.fromJson(json)).toList();
+      _clearCache();
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -78,20 +88,26 @@ class AssetTreeProvider extends ChangeNotifier {
 
   /// Define a query de busca.
   void setSearchQuery(String query) {
+    if (_searchQuery == query) return;
     _searchQuery = query.toLowerCase();
-    notifyListeners();
+    _clearCache();
+    _scheduleNotify();
   }
 
   /// Define o filtro de sensores de energia.
   void setEnergyFilter(bool value) {
+    if (_showEnergySensors == value) return;
     _showEnergySensors = value;
-    notifyListeners();
+    _clearCache();
+    _scheduleNotify();
   }
 
   /// Define o filtro de status crítico.
   void setCriticalFilter(bool value) {
+    if (_showCriticalStatus == value) return;
     _showCriticalStatus = value;
-    notifyListeners();
+    _clearCache();
+    _scheduleNotify();
   }
 
   /// Alterna o estado de expansão de um nó.
@@ -99,7 +115,7 @@ class AssetTreeProvider extends ChangeNotifier {
     final notifier = _expansionNotifiers[nodeId] ?? ValueNotifier<bool>(false);
     notifier.value = !notifier.value;
     _expansionNotifiers[nodeId] = notifier;
-    notifyListeners();
+    _scheduleNotify();
   }
 
   /// Verifica se um nó está expandido.
@@ -108,7 +124,7 @@ class AssetTreeProvider extends ChangeNotifier {
   }
 
   /// Verifica se um ativo deve ser exibido com base nos filtros.
-  bool _shouldShowAsset(Asset asset) {
+  bool shouldShowAsset(Asset asset) {
     if (_searchQuery.isNotEmpty) {
       final name = asset.name.toLowerCase();
       if (!name.contains(_searchQuery)) {
@@ -128,7 +144,7 @@ class AssetTreeProvider extends ChangeNotifier {
   }
 
   /// Verifica se um ativo tem filhos que devem ser exibidos.
-  bool _hasVisibleChildren(Asset asset) {
+  bool hasVisibleChildren(Asset asset) {
     return _assets.any(
       (child) =>
           child.parentId == asset.id && shouldShowAssetWithParents(child),
@@ -141,15 +157,11 @@ class AssetTreeProvider extends ChangeNotifier {
       return true;
     }
 
-    if (_shouldShowAsset(asset)) {
+    if (shouldShowAsset(asset)) {
       return true;
     }
 
-    if (_hasVisibleChildren(asset)) {
-      return true;
-    }
-
-    return false;
+    return hasVisibleChildren(asset);
   }
 
   /// Retorna a cor do status do ativo.
@@ -164,9 +176,9 @@ class AssetTreeProvider extends ChangeNotifier {
     }
   }
 
-  Location? getLocation(String id) {
+  Location? getLocation(String locationId) {
     try {
-      return _locations.firstWhere((loc) => loc.id == id);
+      return _locations.firstWhere((loc) => loc.id == locationId);
     } catch (e) {
       return null;
     }
@@ -177,7 +189,15 @@ class AssetTreeProvider extends ChangeNotifier {
   }
 
   List<Location> getSubLocations(String parentId) {
-    return _locations.where((loc) => loc.parentId == parentId).toList();
+    final cacheKey = 'sub_$parentId';
+    if (_locationCache.containsKey(cacheKey)) {
+      return _locationCache[cacheKey]!;
+    }
+
+    final locations =
+        _locations.where((loc) => loc.parentId == parentId).toList();
+    _locationCache[cacheKey] = locations;
+    return locations;
   }
 
   List<Asset> getUnlinkedAssets() {
@@ -187,15 +207,55 @@ class AssetTreeProvider extends ChangeNotifier {
   }
 
   List<Asset> getLocationAssets(String locationId) {
-    return _assets.where((asset) => asset.locationId == locationId).toList();
+    final cacheKey = 'loc_$locationId';
+    if (_assetCache.containsKey(cacheKey)) {
+      return _assetCache[cacheKey]!;
+    }
+
+    final assets = _assets
+        .where((asset) => asset.locationId == locationId)
+        .where(shouldShowAssetWithParents)
+        .toList();
+
+    _assetCache[cacheKey] = assets;
+    return assets;
   }
 
   List<Asset> getChildAssets(String parentId) {
-    return _assets.where((asset) => asset.parentId == parentId).toList();
+    final cacheKey = 'child_$parentId';
+    if (_assetCache.containsKey(cacheKey)) {
+      return _assetCache[cacheKey]!;
+    }
+
+    final assets = _assets
+        .where((asset) => asset.parentId == parentId)
+        .where(shouldShowAssetWithParents)
+        .toList();
+
+    _assetCache[cacheKey] = assets;
+    return assets;
+  }
+
+  void _clearCache() {
+    _assetCache.clear();
+    _locationCache.clear();
+  }
+
+  void _scheduleNotify() {
+    _isDirty = true;
+    _notifyTimer?.cancel();
+    _notifyTimer = Timer(const Duration(milliseconds: 16), () {
+      if (_isDirty) {
+        _isDirty = false;
+        notifyListeners();
+      }
+    });
   }
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
+    _notifyTimer?.cancel();
     for (final notifier in _expansionNotifiers.values) {
       notifier.dispose();
     }

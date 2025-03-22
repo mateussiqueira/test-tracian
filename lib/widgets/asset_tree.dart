@@ -19,7 +19,7 @@ import 'location_tree_node.dart';
 /// - Manutenção do estado de expansão
 /// - Navegação intuitiva
 /// - Feedback visual claro
-class AssetTree extends StatefulWidget {
+class AssetTree extends StatelessWidget {
   final String companyId;
   final String? locationId;
 
@@ -30,79 +30,61 @@ class AssetTree extends StatefulWidget {
   });
 
   @override
-  State<AssetTree> createState() => _AssetTreeState();
-}
-
-class _AssetTreeState extends State<AssetTree> {
-  bool _isInit = false;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_isInit) {
-        final provider = Provider.of<AssetTreeProvider>(context, listen: false);
-        provider.fetchAssets(widget.companyId);
-        _isInit = true;
-      }
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final provider = Provider.of<AssetTreeProvider>(context);
+    return Consumer<AssetTreeProvider>(
+      builder: (context, provider, _) {
+        if (provider.isLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-    if (provider.isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
+        if (provider.error != null) {
+          return Center(child: Text(provider.error!));
+        }
 
-    if (provider.error != null) {
-      return Center(child: Text(provider.error!));
-    }
+        // Se uma locationId foi especificada, constrói a árvore a partir dela
+        if (locationId != null) {
+          final location = provider.getLocation(locationId!);
+          if (location != null) {
+            return SingleChildScrollView(
+              child: LocationTreeNode(
+                key: ValueKey('location_${location.id}'),
+                location: location,
+                level: 0,
+                provider: provider,
+              ),
+            );
+          }
+          return const SizedBox.shrink();
+        }
 
-    // Se uma locationId foi especificada, constrói a árvore a partir dela
-    if (widget.locationId != null) {
-      final location = provider.getLocation(widget.locationId!);
-      if (location != null) {
+        // Busca localizações raiz e ativos sem vínculo
+        final rootLocations = provider.getRootLocations();
+        final unlinkedAssets = provider.getUnlinkedAssets();
+
         return SingleChildScrollView(
-          child: LocationTreeNode(
-            location: location,
-            level: 0,
-            provider: provider,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ...rootLocations.map(
+                (location) => LocationTreeNode(
+                  key: ValueKey('root_location_${location.id}'),
+                  location: location,
+                  level: 0,
+                  provider: provider,
+                ),
+              ),
+              ...unlinkedAssets.map(
+                (asset) => AssetTreeNode(
+                  key: ValueKey('unlinked_asset_${asset.id}'),
+                  asset: asset,
+                  level: 0,
+                  provider: provider,
+                ),
+              ),
+            ],
           ),
         );
-      }
-      return const SizedBox.shrink();
-    }
-
-    // Busca localizações raiz e ativos sem vínculo
-    final rootLocations = provider.getRootLocations();
-    final unlinkedAssets = provider.getUnlinkedAssets();
-
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Renderiza localizações raiz
-          ...rootLocations.map(
-            (location) => LocationTreeNode(
-              key: ValueKey('location_${location.id}'),
-              location: location,
-              level: 0,
-              provider: provider,
-            ),
-          ),
-          // Renderiza ativos sem vínculo
-          ...unlinkedAssets.map(
-            (asset) => AssetTreeNode(
-              key: ValueKey('asset_${asset.id}'),
-              asset: asset,
-              level: 0,
-              provider: provider,
-            ),
-          ),
-        ],
-      ),
+      },
     );
   }
 }

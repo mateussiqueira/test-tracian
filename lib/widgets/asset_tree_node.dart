@@ -18,7 +18,7 @@ class AssetTreeNode extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!provider.shouldShowAssetWithParents(asset)) {
-      return const SizedBox();
+      return const SizedBox.shrink();
     }
 
     final childAssets = provider.getChildAssets(asset.id);
