@@ -1,4 +1,4 @@
-# Test Tractian
+# test-tracian
 
 Este projeto é um aplicativo Flutter desenvolvido para a Tractian, focado em visualização e gerenciamento de ativos industriais. O aplicativo permite uma visualização hierárquica de ativos e localizações, com recursos de filtragem e busca.
 
