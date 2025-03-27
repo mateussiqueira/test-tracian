@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
@@ -58,54 +57,16 @@ class AssetTreeProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Simular carregamento de dados
-      await Future.delayed(const Duration(seconds: 1));
+      final locationsJson = await ApiService.fetchLocations(companyId);
+      final assetsJson = await ApiService.fetchAssets(companyId);
 
-      // Dados de exemplo
-      final locationsJson = json.decode('''
-        [
-          {
-            "id": "loc1",
-            "name": "Factory 1",
-            "parentId": null
-          },
-          {
-            "id": "loc2",
-            "name": "Factory 2",
-            "parentId": null
-          },
-          {
-            "id": "loc3",
-            "name": "Building A",
-            "parentId": "loc1"
-          }
-        ]
-      ''');
+      _locations = List<Location>.from(
+        locationsJson.map((json) => Location.fromJson(json)),
+      );
 
-      final assetsJson = json.decode('''
-        [
-          {
-            "id": "asset1",
-            "name": "Machine 1",
-            "parentId": null,
-            "locationId": "loc1",
-            "sensorType": "energy",
-            "status": "alert"
-          },
-          {
-            "id": "asset2",
-            "name": "Machine 2",
-            "parentId": "asset1",
-            "locationId": "loc1",
-            "sensorType": "vibration",
-            "status": "operating"
-          }
-        ]
-      ''');
-
-      _locations =
-          locationsJson.map((json) => Location.fromJson(json)).toList();
-      _assets = assetsJson.map((json) => Asset.fromJson(json)).toList();
+      _assets = List<Asset>.from(
+        assetsJson.map((json) => Asset.fromJson(json)),
+      );
       _clearCache();
     } catch (e) {
       _error = e.toString();
