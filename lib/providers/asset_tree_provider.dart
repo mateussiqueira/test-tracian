@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
@@ -25,6 +26,7 @@ class AssetTreeProvider extends ChangeNotifier {
   final String companyId;
   List<Location> _locations = [];
   List<Asset> _assets = [];
+  final Set<String> _expandedNodes = {};
   bool _isLoading = false;
   String? _error;
 
@@ -39,9 +41,6 @@ class AssetTreeProvider extends ChangeNotifier {
   Timer? _debounceTimer;
   bool _isDirty = false;
   Timer? _notifyTimer;
-
-  // Estado de expansão dos nós
-  final Map<String, ValueNotifier<bool>> _expansionNotifiers = {};
 
   AssetTreeProvider({required this.companyId}) {
     loadData();
@@ -59,16 +58,58 @@ class AssetTreeProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final locationsJson = await ApiService.fetchLocations(companyId);
-      final assetsJson = await ApiService.fetchAssets(companyId);
+      // Simular carregamento de dados
+      await Future.delayed(const Duration(seconds: 1));
+
+      // Dados de exemplo
+      final locationsJson = json.decode('''
+        [
+          {
+            "id": "loc1",
+            "name": "Factory 1",
+            "parentId": null
+          },
+          {
+            "id": "loc2",
+            "name": "Factory 2",
+            "parentId": null
+          },
+          {
+            "id": "loc3",
+            "name": "Building A",
+            "parentId": "loc1"
+          }
+        ]
+      ''');
+
+      final assetsJson = json.decode('''
+        [
+          {
+            "id": "asset1",
+            "name": "Machine 1",
+            "parentId": null,
+            "locationId": "loc1",
+            "sensorType": "energy",
+            "status": "alert"
+          },
+          {
+            "id": "asset2",
+            "name": "Machine 2",
+            "parentId": "asset1",
+            "locationId": "loc1",
+            "sensorType": "vibration",
+            "status": "operating"
+          }
+        ]
+      ''');
+
       _locations =
           locationsJson.map((json) => Location.fromJson(json)).toList();
       _assets = assetsJson.map((json) => Asset.fromJson(json)).toList();
       _clearCache();
-      _isLoading = false;
-      notifyListeners();
     } catch (e) {
-      _error = 'Erro ao carregar dados: $e';
+      _error = e.toString();
+    } finally {
       _isLoading = false;
       notifyListeners();
     }
@@ -111,16 +152,18 @@ class AssetTreeProvider extends ChangeNotifier {
   }
 
   /// Alterna o estado de expansão de um nó.
-  void toggleNodeExpansion(String nodeId) {
-    final notifier = _expansionNotifiers[nodeId] ?? ValueNotifier<bool>(false);
-    notifier.value = !notifier.value;
-    _expansionNotifiers[nodeId] = notifier;
-    _scheduleNotify();
+  void toggleNode(String nodeId) {
+    if (_expandedNodes.contains(nodeId)) {
+      _expandedNodes.remove(nodeId);
+    } else {
+      _expandedNodes.add(nodeId);
+    }
+    notifyListeners();
   }
 
   /// Verifica se um nó está expandido.
   bool isNodeExpanded(String nodeId) {
-    return _expansionNotifiers[nodeId]?.value ?? false;
+    return _expandedNodes.contains(nodeId);
   }
 
   /// Verifica se um ativo deve ser exibido com base nos filtros.
@@ -201,9 +244,7 @@ class AssetTreeProvider extends ChangeNotifier {
   }
 
   List<Asset> getUnlinkedAssets() {
-    return _assets
-        .where((asset) => asset.locationId == null && asset.parentId == null)
-        .toList();
+    return _assets.where((asset) => asset.locationId == null).toList();
   }
 
   List<Asset> getLocationAssets(String locationId) {
@@ -256,9 +297,6 @@ class AssetTreeProvider extends ChangeNotifier {
   void dispose() {
     _debounceTimer?.cancel();
     _notifyTimer?.cancel();
-    for (final notifier in _expansionNotifiers.values) {
-      notifier.dispose();
-    }
     super.dispose();
   }
 }

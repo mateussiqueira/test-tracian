@@ -28,39 +28,62 @@ class AssetTreeNode extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: EdgeInsets.only(left: level * 16.0),
-          child: InkWell(
-            onTap: hasChildren
-                ? () => provider.toggleNodeExpansion(asset.id)
-                : null,
-            child: ListTile(
-              leading: Icon(
-                asset.sensorType == 'energy'
-                    ? Icons.electric_bolt
-                    : Icons.devices,
-                color: asset.status == 'alert' ? Colors.red : null,
-              ),
-              title: Text(asset.name),
-              trailing: hasChildren
-                  ? Icon(isExpanded ? Icons.expand_less : Icons.expand_more)
-                  : null,
+        // Asset header
+        InkWell(
+          onTap: hasChildren ? () => provider.toggleNode(asset.id) : null,
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: level * 16.0,
+              right: 16.0,
+              top: 8.0,
+              bottom: 8.0,
+            ),
+            child: Row(
+              children: [
+                if (hasChildren)
+                  Icon(
+                    isExpanded ? Icons.expand_less : Icons.expand_more,
+                    size: 20,
+                  )
+                else
+                  const SizedBox(width: 20),
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.devices,
+                  size: 20,
+                  color: asset.statusColor,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    asset.name,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
+        // Child assets
         if (isExpanded && hasChildren)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: childAssets
-                .map(
-                  (child) => AssetTreeNode(
-                    key: ValueKey('child_asset_${child.id}'),
-                    asset: child,
-                    level: level + 1,
-                    provider: provider,
-                  ),
-                )
-                .toList(),
+          Padding(
+            padding: EdgeInsets.only(left: (level + 1) * 16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: childAssets
+                  .map(
+                    (childAsset) => AssetTreeNode(
+                      key: ValueKey('child_asset_${childAsset.id}'),
+                      asset: childAsset,
+                      level: level + 1,
+                      provider: provider,
+                    ),
+                  )
+                  .toList(),
+            ),
           ),
       ],
     );

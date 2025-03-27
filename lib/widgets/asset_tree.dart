@@ -20,69 +20,88 @@ import 'location_tree_node.dart';
 /// - Navegação intuitiva
 /// - Feedback visual claro
 class AssetTree extends StatelessWidget {
-  final String companyId;
   final String? locationId;
 
   const AssetTree({
     super.key,
-    required this.companyId,
     this.locationId,
   });
 
   @override
   Widget build(BuildContext context) {
     return Consumer<AssetTreeProvider>(
-      builder: (context, provider, _) {
+      builder: (context, provider, child) {
         if (provider.isLoading) {
           return const Center(child: CircularProgressIndicator());
         }
 
         if (provider.error != null) {
-          return Center(child: Text(provider.error!));
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Error: ${provider.error}',
+                  style: const TextStyle(color: Colors.red),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => provider.loadData(),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          );
         }
 
-        // Se uma locationId foi especificada, constrói a árvore a partir dela
         if (locationId != null) {
           final location = provider.getLocation(locationId!);
-          if (location != null) {
-            return SingleChildScrollView(
-              child: LocationTreeNode(
-                key: ValueKey('location_${location.id}'),
-                location: location,
-                level: 0,
-                provider: provider,
-              ),
-            );
+          if (location == null) {
+            return const Center(child: Text('Location not found'));
           }
-          return const SizedBox.shrink();
+          return SingleChildScrollView(
+            child: LocationTreeNode(
+              location: location,
+              level: 0,
+              provider: provider,
+            ),
+          );
         }
 
-        // Busca localizações raiz e ativos sem vínculo
-        final rootLocations = provider.getRootLocations();
-        final unlinkedAssets = provider.getUnlinkedAssets();
-
-        return SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ...rootLocations.map(
-                (location) => LocationTreeNode(
-                  key: ValueKey('root_location_${location.id}'),
-                  location: location,
-                  level: 0,
-                  provider: provider,
-                ),
+        // Virtualized list for root locations and unlinked assets
+        return CustomScrollView(
+          slivers: [
+            // Root locations
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final locations = provider.getRootLocations();
+                  if (index >= locations.length) return null;
+                  return LocationTreeNode(
+                    location: locations[index],
+                    level: 0,
+                    provider: provider,
+                  );
+                },
+                childCount: provider.getRootLocations().length,
               ),
-              ...unlinkedAssets.map(
-                (asset) => AssetTreeNode(
-                  key: ValueKey('unlinked_asset_${asset.id}'),
-                  asset: asset,
-                  level: 0,
-                  provider: provider,
-                ),
+            ),
+            // Unlinked assets
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final assets = provider.getUnlinkedAssets();
+                  if (index >= assets.length) return null;
+                  return AssetTreeNode(
+                    asset: assets[index],
+                    level: 0,
+                    provider: provider,
+                  );
+                },
+                childCount: provider.getUnlinkedAssets().length,
               ),
-            ],
-          ),
+            ),
+          ],
         );
       },
     );
