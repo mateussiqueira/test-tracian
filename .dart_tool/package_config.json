@@ -554,10 +554,10 @@
       "languageVersion": "3.0"
     }
   ],
-  "generated": "2025-03-22T13:49:42.423872Z",
+  "generated": "2025-03-27T22:22:36.532255Z",
   "generator": "pub",
-  "generatorVersion": "3.7.0",
+  "generatorVersion": "3.7.2",
   "flutterRoot": "file:///Users/mateussiqueira/development/flutter",
-  "flutterVersion": "3.29.1",
+  "flutterVersion": "3.29.2",
   "pubCache": "file:///Users/mateussiqueira/.pub-cache"
 }

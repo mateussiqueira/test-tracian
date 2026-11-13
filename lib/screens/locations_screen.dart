@@ -69,19 +69,17 @@ class _LocationsView extends StatelessWidget {
       );
     }
 
-    return Scaffold(
-      appBar: const CustomAppBar(title: 'Localizações', showBackButton: true),
+    return const Scaffold(
+      appBar: CustomAppBar(title: 'Localizações', showBackButton: true),
       body: Column(
         children: [
           // Controles de busca e filtros
-          const SearchControls(),
+          SearchControls(),
           // Árvore de ativos
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: AssetTree(
-                companyId: provider.companyId,
-              ),
+              padding: EdgeInsets.all(16.0),
+              child: AssetTree(),
             ),
           ),
         ],
